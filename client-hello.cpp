@@ -80,27 +80,22 @@ int main(int argc, char* argv[]) {
         Packet data_pkt;
         data_pkt.type = DATA;
         data_pkt.seq = seq_num;
-        data_pkt.data = {'H', 'e', 'l', 'l', 'o', ' ', 'W', 'o', 'r', 'l', 'd'};
-        if (bytes_read > 0) {
-            while (true) {
-                sendPacket(sockfd, data_pkt, client_addr);
-                LOG(INFO) << "Sent data packet with seq " << seq_num;
-                // Wait for ACK
-                ssize_t n = recvPacket(sockfd, pkt, client_addr);
-                if (n > 0 && pkt.type == DATA_ACK && pkt.seq == seq_num) {
-                    LOG(INFO) << "Received ACK for seq " << seq_num;
-                    seq_num++;
-                    break;
-                } else {
-                    LOG(WARNING) << "No ACK or wrong ACK received, resending packet";
-                    // Resend the packet
-                    continue;
-                }
-            }
-        } else {
-            // End of file
-            infile.close();
+        // 原始字符数组
+        char char_array[] = {'H', 'e', 'l', 'l', 'o', ' ', 'W', 'o', 'r', 'l', 'd', '\0'}; // 注意结尾加 \0 以标识字符串结束
+        // 使用 std::string 构造函数直接赋值
+        data_pkt.data = std::string(char_array);
+        sendPacket(sockfd, data_pkt, server_addr);
+        LOG(INFO) << "Sent data packet with seq " << seq_num;
+        // Wait for ACK
+        ssize_t n = recvPacket(sockfd, pkt, server_addr);
+        if (n > 0 && pkt.type == DATA_ACK && pkt.seq == seq_num) {
+            LOG(INFO) << "Received ACK for seq " << seq_num;
+            seq_num++;
             break;
+        } else {
+            LOG(WARNING) << "No ACK or wrong ACK received, resending packet";
+            // Resend the packet
+            continue;
         }
     }
 
@@ -123,7 +118,7 @@ int main(int argc, char* argv[]) {
     // 这里去接受服务器的信息
     uint32_t expected_seq = 0; // 期望收到的数据报数量
      while (true) {
-        ssize_t n = recvPacket(sockfd, pkt, client_addr);
+        ssize_t n = recvPacket(sockfd, pkt, server_addr);
          if (n > 0 && pkt.type == DATA) {
             if (pkt.seq == expected_seq) {
                 LOG(INFO) << "Received data packet with seq " << pkt.seq << "data is: " << pkt.data;
@@ -131,7 +126,7 @@ int main(int argc, char* argv[]) {
                 Packet ack_pkt;
                 ack_pkt.type = DATA_ACK;
                 ack_pkt.seq = pkt.seq;
-                sendPacket(sockfd, ack_pkt, client_addr);
+                sendPacket(sockfd, ack_pkt, server_addr);
                 LOG(INFO) << "Sent ACK for seq " << pkt.seq;
                 expected_seq++;
             } else {
@@ -139,7 +134,7 @@ int main(int argc, char* argv[]) {
                 Packet ack_pkt;
                 ack_pkt.type = DATA_ACK;
                 ack_pkt.seq = expected_seq - 1;
-                sendPacket(sockfd, ack_pkt, client_addr);
+                sendPacket(sockfd, ack_pkt, server_addr);
                 LOG(WARNING) << "Unexpected seq. Expected " << expected_seq
                              << ", but got " << pkt.seq;
             }
@@ -152,12 +147,12 @@ int main(int argc, char* argv[]) {
             // Send FIN-ACK
             Packet fin_ack_pkt;
             fin_ack_pkt.type = FIN_ACK;
-            sendPacket(sockfd, fin_ack_pkt, client_addr);
+            sendPacket(sockfd, fin_ack_pkt, server_addr);
             LOG(INFO) << "Sent FIN-ACK to client";
             break;
         }
      }
-     
+
 
     close(sockfd);
     LOG(INFO) << "Connection closed";

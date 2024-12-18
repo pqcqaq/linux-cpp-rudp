@@ -113,27 +113,22 @@ int main(int argc, char* argv[]) {
         Packet data_pkt;
         data_pkt.type = DATA;
         data_pkt.seq = seq_num;
-        data_pkt.data = {'I','','a','m','','h','a','p','p','y'};
-        if (bytes_read > 0) {
-            while (true) {
-                sendPacket(sockfd, data_pkt, client_addr);
-                LOG(INFO) << "Sent data packet with seq " << seq_num;
-                // Wait for ACK
-                ssize_t n = recvPacket(sockfd, pkt, client_addr);
-                if (n > 0 && pkt.type == DATA_ACK && pkt.seq == seq_num) {
-                    LOG(INFO) << "Received ACK for seq " << seq_num;
-                    seq_num++;
-                    break;
-                } else {
-                    LOG(WARNING) << "No ACK or wrong ACK received, resending packet";
-                    // Resend the packet
-                    continue;
-                }
-            }
-        } else {
-            // End of file
-            infile.close();
+        // 原始字符数组
+        char char_array[] = {'H', 'e', 'l', 'l', 'o', ' ', 'W', 'o', 'r', 'l', 'd', '\0'}; // 注意结尾加 \0 以标识字符串结束
+        // 使用 std::string 构造函数直接赋值
+        data_pkt.data = std::string(char_array);
+        sendPacket(sockfd, data_pkt, client_addr);
+        LOG(INFO) << "Sent data packet with seq " << seq_num;
+        // Wait for ACK
+        ssize_t n = recvPacket(sockfd, pkt, client_addr);
+        if (n > 0 && pkt.type == DATA_ACK && pkt.seq == seq_num) {
+            LOG(INFO) << "Received ACK for seq " << seq_num;
+            seq_num++;
             break;
+        } else {
+            LOG(WARNING) << "No ACK or wrong ACK received, resending packet";
+            // Resend the packet
+            continue;
         }
     }
 
