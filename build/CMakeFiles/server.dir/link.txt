@@ -1,1 +1,0 @@
-/usr/bin/c++ CMakeFiles/server.dir/server.cpp.o -o server  -lglog -lpthread 

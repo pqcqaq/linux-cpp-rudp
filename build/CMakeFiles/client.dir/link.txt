@@ -1,1 +1,0 @@
-/usr/bin/c++ CMakeFiles/client.dir/client.cpp.o -o client  -lglog -lpthread 

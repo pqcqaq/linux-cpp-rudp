@@ -1,4 +1,0 @@
-/home/qcqcqc/workspace/network-experiment/network-experiments/rudp/sy03-rudp/build/CMakeFiles/server.dir
-/home/qcqcqc/workspace/network-experiment/network-experiments/rudp/sy03-rudp/build/CMakeFiles/client.dir
-/home/qcqcqc/workspace/network-experiment/network-experiments/rudp/sy03-rudp/build/CMakeFiles/edit_cache.dir
-/home/qcqcqc/workspace/network-experiment/network-experiments/rudp/sy03-rudp/build/CMakeFiles/rebuild_cache.dir
