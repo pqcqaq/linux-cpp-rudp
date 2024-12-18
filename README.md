@@ -40,6 +40,11 @@
 
 ## 使用编译后的可执行文件：
 
+简单文本传输：
+- 使用./server-hello \<port\> 的形式启动服务器.
+- 使用./client-hello \<host\>:\<port\>的形式来打开客户端
+
+文件传输：
 - 使用./server \<port\> \<filename\>的形式启动服务器.
 - 使用./client \<host\>:\<port\> \<filename\>的形式来打开客户端
 
