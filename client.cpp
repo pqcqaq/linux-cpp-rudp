@@ -2,6 +2,9 @@
 #include "rudp.h"
 #include <fstream>
 
+// 这里是客户端的实现
+// 先发文件，再收文件
+// 三次握手和四次挥手
 int main(int argc, char* argv[]) {
     google::InitGoogleLogging(argv[0]);
 
