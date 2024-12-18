@@ -19,12 +19,14 @@ int main(int argc, char* argv[]) {
     std::string host_port = argv[1];
     std::string filename = argv[2];
 
+    // 妈的这里要单独判断localhost的话感觉很不爽，就这样好了
     size_t colon_pos = host_port.find(':');
     if (colon_pos == std::string::npos) {
         LOG(ERROR) << "Invalid host:port format";
         return -1;
     }
 
+    // 没法支持localhost，解析不了这个ip
     std::string host = host_port.substr(0, colon_pos);
     int port = atoi(host_port.substr(colon_pos + 1).c_str());
 
@@ -50,7 +52,7 @@ int main(int argc, char* argv[]) {
     Packet pkt;
     Packet recv_pkt;
 
-    // Send SYN
+    // Send SYN 一旦连接创建出来了，就先发一个握手包，看看能不能通
     pkt.type = SYN;
     pkt.seq = 0;
     sendPacket(sockfd, pkt, server_addr);
@@ -78,6 +80,7 @@ int main(int argc, char* argv[]) {
         return -1;
     }
 
+    // 客户端先发送文件，没什么好说的
     uint32_t seq_num = 0;
     while (true) {
         Packet data_pkt;
@@ -109,6 +112,7 @@ int main(int argc, char* argv[]) {
         }
     }
 
+    // 这里已经可以断开连接了，实际上等服务端的FIN-ASK的时候，中间再去接受个文件也行
     // Initiate connection termination
     Packet fin_pkt;
     fin_pkt.type = FIN;
@@ -158,6 +162,7 @@ int main(int argc, char* argv[]) {
             Packet fin_ack_pkt;
             fin_ack_pkt.type = FIN_ACK;
             sendPacket(sockfd, fin_ack_pkt, server_addr);
+	    // 最后一次挥手
             LOG(INFO) << "Sent FIN-ACK to server";
             break;
         }

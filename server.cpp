@@ -32,18 +32,22 @@ int main(int argc, char* argv[]) {
     server_addr.sin_addr.s_addr = INADDR_ANY;
     server_addr.sin_port = htons(port);
 
+    // 这里有可能端口已经被占用，先判断一下
     if (bind(sockfd, (const struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
         LOG(ERROR) << "Bind failed";
         close(sockfd);
         return -1;
     }
 
+    // Waiting for connection
     LOG(INFO) << "Server listening on port " << port;
 
-    // Connection establishment (three-way handshake)
+    // Connection establishment (三次握手)
     Packet pkt;
     while (true) {
         ssize_t n = recvPacket(sockfd, pkt, client_addr);
+
+	// 收到建立连接的请求
         if (n > 0 && pkt.type == SYN) {
             LOG(INFO) << "Received SYN from client";
             // Send SYN-ACK
@@ -64,14 +68,14 @@ int main(int argc, char* argv[]) {
 
     // Receive file from client
     std::ofstream outfile("received_from_client_" + filename, std::ios::binary);
-    uint32_t expected_seq = 0;
+    uint32_t expected_seq = 0; // 期望收到的数据报数量
     while (true) {
         ssize_t n = recvPacket(sockfd, pkt, client_addr);
         if (n > 0 && pkt.type == DATA) {
             if (pkt.seq == expected_seq) {
                 outfile.write(pkt.data, n - HEADER_SIZE);
                 LOG(INFO) << "Received data packet with seq " << pkt.seq;
-                // Send DATA_ACK
+                // Send DATA_ACK 表示收到数据报
                 Packet ack_pkt;
                 ack_pkt.type = DATA_ACK;
                 ack_pkt.seq = pkt.seq;
@@ -79,7 +83,7 @@ int main(int argc, char* argv[]) {
                 LOG(INFO) << "Sent ACK for seq " << pkt.seq;
                 expected_seq++;
             } else {
-                // Send ACK for last received packet
+                // Send ACK for last received packet 接收完成，发送ACK
                 Packet ack_pkt;
                 ack_pkt.type = DATA_ACK;
                 ack_pkt.seq = expected_seq - 1;
@@ -101,10 +105,14 @@ int main(int argc, char* argv[]) {
             break;
         }
     }
+
+    // 接收文件完成，下面要发文件给客户端试试
     outfile.close();
 
     // Send file to client
     std::ifstream infile(filename, std::ios::binary);
+
+    // 打开失败
     if (!infile) {
         LOG(ERROR) << "Failed to open file " << filename;
         close(sockfd);
@@ -141,7 +149,7 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    // Connection termination (four-way handshake)
+    // Connection termination (四次挥手)
     Packet fin_pkt;
     fin_pkt.type = FIN;
     sendPacket(sockfd, fin_pkt, client_addr);
