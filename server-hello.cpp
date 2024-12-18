@@ -75,7 +75,7 @@ int main(int argc, char* argv[]) {
         ssize_t n = recvPacket(sockfd, pkt, client_addr);
          if (n > 0 && pkt.type == DATA) {
             if (pkt.seq == expected_seq) {
-                LOG(INFO) << "Received data packet with seq " << pkt.seq << "data is: " << pkt.data;
+                LOG(INFO) << "Received data packet with seq " << pkt.seq << " data is: " << pkt.data;
                 // Send DATA_ACK 表示收到数据报
                 Packet ack_pkt;
                 ack_pkt.type = DATA_ACK;
