@@ -4,6 +4,11 @@
 
 int main(int argc, char* argv[]) {
     google::InitGoogleLogging(argv[0]);
+    // 日志配置
+    FLAGS_log_dir = "./logs";       // 日志保存目录
+    FLAGS_logtostderr = 1;          // 日志输出到 stderr
+    FLAGS_minloglevel = 0;          // 日志级别: INFO 及以上
+    FLAGS_v = 2;                    // 设置详细级别
 
     if (argc != 3) {
         LOG(ERROR) << "Usage: ./server <port> <filename>";
