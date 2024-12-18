@@ -12,15 +12,10 @@ find_package(Glog REQUIRED)
 # Include directories
 include_directories(${GLOG_INCLUDE_DIRS})
 
-# Add executable for server
-add_executable(server server.cpp)
+# Glob all .cpp files in the current directory
+file(GLOB SOURCES "*.cpp")
 
-# Link glog and pthread to server
-target_link_libraries(server ${GLOG_LIBRARIES} glog pthread)
-
-# Add executable for client
-add_executable(client client.cpp)
-
-# Link glog and pthread to client
-target_link_libraries(client ${GLOG_LIBRARIES} glog pthread)
+# Add executable and link libraries
+add_executable(rudp ${SOURCES})
+target_link_libraries(rudp ${GLOG_LIBRARIES} glog pthread)
 
