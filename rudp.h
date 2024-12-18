@@ -1,5 +1,5 @@
 // rudp.h
-#ifndef RUDP_H
+#ifndef RUDP_H // 防止头文件冲突，如果已经存在就跳过这次的定义
 #define RUDP_H
 
 #include <arpa/inet.h>
@@ -10,12 +10,12 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
-// Constants
+// 常量定义
 const int MAX_BUFFER_SIZE = 1024;
 const int HEADER_SIZE = 12; // type (4 bytes) + seq (4 bytes) + checksum (4 bytes)
 const int DATA_SIZE = MAX_BUFFER_SIZE - HEADER_SIZE;
 
-// Message Types
+// Message Types 消息类型的枚举定义
 enum MessageType {
     SYN = 1,
     SYN_ACK,
@@ -26,7 +26,7 @@ enum MessageType {
     FIN_ACK
 };
 
-// Packet Structure
+// Packet Structure 报文的数据结构定义，接收到报文后可以直接通过指针转换成这个类型，直接读取对应的内存段
 struct Packet {
     uint32_t type;
     uint32_t seq;
@@ -38,7 +38,7 @@ struct Packet {
     }
 };
 
-// Function to calculate checksum
+// Function to calculate checksum 计算校验值
 uint32_t calculateChecksum(Packet& pkt) {
     uint32_t sum = pkt.type + pkt.seq;
     for (int i = 0; i < DATA_SIZE; ++i) {
@@ -47,7 +47,7 @@ uint32_t calculateChecksum(Packet& pkt) {
     return sum;
 }
 
-// Function to send a packet
+// Function to send a packet 发送一个数据报
 ssize_t sendPacket(int sockfd, const Packet& pkt, const sockaddr_in& addr) {
     Packet send_pkt = pkt;
     send_pkt.checksum = calculateChecksum(send_pkt);
@@ -56,7 +56,7 @@ ssize_t sendPacket(int sockfd, const Packet& pkt, const sockaddr_in& addr) {
     return bytes_sent;
 }
 
-// Function to receive a packet with timeout
+// Function to receive a packet with timeout 接收一个数据报，可以设定超时时间
 ssize_t recvPacket(int sockfd, Packet& pkt, sockaddr_in& addr, int timeout_sec = 1) {
     socklen_t addr_len = sizeof(addr);
     fd_set read_fds;
@@ -72,7 +72,7 @@ ssize_t recvPacket(int sockfd, Packet& pkt, sockaddr_in& addr, int timeout_sec =
         perror("select"); // error occurred
         return -1;
     } else if (rv == 0) {
-        // Timeout occurred
+        // Timeout occurred 超时
         return 0;
     } else {
         ssize_t bytes_received = recvfrom(sockfd, &pkt, sizeof(pkt), 0,
@@ -82,7 +82,7 @@ ssize_t recvPacket(int sockfd, Packet& pkt, sockaddr_in& addr, int timeout_sec =
         uint32_t calculated_checksum = calculateChecksum(pkt);
         if (received_checksum != calculated_checksum) {
             LOG(WARNING) << "Checksum mismatch!";
-            return -1; // Indicate checksum error
+            return -1; // Indicate checksum error 草，校验不通过
         }
         return bytes_received;
     }
