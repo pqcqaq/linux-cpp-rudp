@@ -1,5 +1,6 @@
 // client.cpp
 #include "rudp.h"
+#include <cstring> // 为 strncpy 引入头文件
 
 // 这里是客户端的实现
 // 先发文件，再收文件
@@ -82,8 +83,9 @@ int main(int argc, char* argv[]) {
         data_pkt.seq = seq_num;
         // 原始字符数组
         char char_array[] = {'H', 'e', 'l', 'l', 'o', ' ', 'W', 'o', 'r', 'l', 'd', '\0'}; // 注意结尾加 \0 以标识字符串结束
-        // 使用 std::string 构造函数直接赋值
-        data_pkt.data = std::string(char_array);
+        // 使用 strncpy 将字符串复制到固定大小的 char 数组中
+        std::strncpy(data_pkt.data, char_array, DATA_SIZE - 1); // 确保不会溢出，并保留最后的空终止符
+        data_pkt.data[DATA_SIZE - 1] = '\0'; // 明确添加字符串结束符
         sendPacket(sockfd, data_pkt, server_addr);
         LOG(INFO) << "Sent data packet with seq " << seq_num;
         // Wait for ACK
