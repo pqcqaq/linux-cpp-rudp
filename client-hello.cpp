@@ -14,13 +14,12 @@ int main(int argc, char* argv[]) {
     FLAGS_minloglevel = 0;          // 日志级别: INFO 及以上
     FLAGS_v = 2;                    // 设置详细级别
 
-    if (argc != 3) {
-        LOG(ERROR) << "Usage: ./client <host>:<port> <filename>";
+    if (argc != 2) {
+        LOG(ERROR) << "Usage: ./client <host>:<port>";
         return -1;
     }
 
     std::string host_port = argv[1];
-    std::string filename = argv[2];
 
     // 妈的这里要单独判断localhost的话感觉很不爽，就这样好了
     size_t colon_pos = host_port.find(':');

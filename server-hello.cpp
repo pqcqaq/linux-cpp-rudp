@@ -14,13 +14,12 @@ int main(int argc, char* argv[]) {
     FLAGS_minloglevel = 0;          // 日志级别: INFO 及以上
     FLAGS_v = 2;                    // 设置详细级别
 
-    if (argc != 3) {
-        LOG(ERROR) << "Usage: ./server <port> <filename>";
+    if (argc != 2) {
+        LOG(ERROR) << "Usage: ./server <port>";
         return -1;
     }
 
     int port = atoi(argv[1]);
-    std::string filename = argv[2];
 
     int sockfd;
     sockaddr_in server_addr{}, client_addr{};
