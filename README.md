@@ -17,7 +17,7 @@
 项目中使用到了glog, 你可能需要安装glog库才能正常进行编译：
 
 ```bash
-    sudo apt update sudo apt install libgoogle-glog-dev 
+    sudo apt update && sudo apt install libgoogle-glog-dev 
 ```
 
 ## 编译
