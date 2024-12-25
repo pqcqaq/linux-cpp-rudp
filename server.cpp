@@ -2,8 +2,11 @@
 #include "rudp.h"
 #include <fstream>
 
-// 服务端实现，接收客户端发送的文件并返回文件
 
+// 这是服务端的实现，为了方便，这里没有考虑多客户机的情况。
+// 如果要使用多客户机，可以添加pthread
+// 在接收到SYN之后，转到新的线程去处理这个客户机即可
+// 主要是懒得搞了，反正效果差不多
 int main(int argc, char* argv[]) {
     std::string process_name = argv[0];
     google::InitGoogleLogging(argv[0]);
