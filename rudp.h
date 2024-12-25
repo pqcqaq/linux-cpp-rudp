@@ -42,18 +42,50 @@ struct Packet {
     }
 };
 
+// /**
+//  * @brief 计算校验和
+//  *  这里实现一个最简单的校验和计算方法，将所有字段相加。
+//  * @param pkt  要计算校验和的数据包
+//  * @return uint32_t  返回计算得到的校验和
+//  */
+// uint32_t calculateChecksum(Packet& pkt) {
+//     uint32_t sum = pkt.type + pkt.seq + pkt.data_length;
+//     for (uint32_t i = 0; i < pkt.data_length; ++i) {
+//         sum += static_cast<uint8_t>(pkt.data[i]);
+//     }
+//     return sum;
+// }
+
+uint16_t fletcher16(const uint8_t *data, size_t len) {
+    uint16_t sum1 = 0;
+    uint16_t sum2 = 0;
+
+    for (size_t i = 0; i < len; ++i) {
+        sum1 = (sum1 + data[i]) % 255;
+        sum2 = (sum2 + sum1) % 255;
+    }
+
+    return (sum2 << 8) | sum1;
+}
+
 /**
- * @brief 计算校验和
- *  这里实现一个最简单的校验和计算方法，即将所有字段相加。
+ * @brief  计算校验和
+ *  这里使用 Fletcher-16 校验和算法，它是一种简单的校验和算法，适用于小数据块。
  * @param pkt  要计算校验和的数据包
  * @return uint32_t  返回计算得到的校验和
  */
-uint32_t calculateChecksum(Packet& pkt) {
-    uint32_t sum = pkt.type + pkt.seq + pkt.data_length;
-    for (uint32_t i = 0; i < pkt.data_length; ++i) {
-        sum += static_cast<uint8_t>(pkt.data[i]);
-    }
-    return sum;
+uint32_t calculateChecksum(const Packet& pkt) {
+    // 将 Packet 的成员变量按顺序放入一个缓冲区
+    uint8_t buffer[sizeof(pkt)];
+    std::memcpy(buffer, &pkt, sizeof(pkt));
+
+    // 将 checksum 字段清零，然后再计算校验和
+    Packet tempPkt;
+    std::memcpy(&tempPkt, &pkt, sizeof(pkt));
+    tempPkt.checksum = 0;
+    std::memcpy(buffer, &tempPkt, sizeof(pkt));
+
+    return fletcher16(buffer, sizeof(pkt));
 }
 
 /**
@@ -69,6 +101,16 @@ ssize_t sendPacket(int sockfd, const Packet& pkt, const sockaddr_in& addr) {
     // 确保数据包的长度正确
     send_pkt.checksum = 0;  // Reset checksum before calculation
     send_pkt.checksum = calculateChecksum(send_pkt);
+    // 
+    // sendto(): 用于发送数据包的系统调用，通常用于UDP套接字。它允许你将数据发送到指定的网络地址。
+    // 参数：
+    // sockfd: 套接字文件描述符。
+    // buf: 指向要发送的数据缓冲区的指针。
+    // len: 要发送的数据的字节数。
+    // flags: 通常设置为0。可以设置一些标志位来控制发送行为，但大多数情况下不需要。
+    // dest_addr: 指向 sockaddr 结构体的指针，该结构体包含目标地址的信息（IP地址和端口号）。
+    // addrlen: dest_addr 结构体的大小。
+    // 返回值：成功时返回发送的字节数，失败时返回-1并设置errno。
     ssize_t bytes_sent = sendto(sockfd, &send_pkt, sizeof(send_pkt), 0,
                                 (const struct sockaddr*)&addr, sizeof(addr));
     return bytes_sent;
@@ -94,7 +136,20 @@ ssize_t recvPacket(int sockfd, Packet& pkt, sockaddr_in& addr, int timeout_sec =
     FD_ZERO(&read_fds);
     FD_SET(sockfd, &read_fds);
 
+    // select(): 这是一个用于多路I/O复用的系统调用。它允许程序监视多个文件描述符，以确定哪些文件描述符可读、可写或有错误发生。  
+    // 它可以用来实现带超时的I/O操作，避免程序阻塞在某个I/O操作上。
+    // 参数：
+    // nfds: 被监视的文件描述符集中最大文件描述符的值加1. sockfd + 1 确保了包含 sockfd 本身。
+    // readfds: 指向 fd_set 结构体的指针，用于指定要监视可读性的文件描述符集合。
+    // writefds: 指向 fd_set 结构体的指针，用于指定要监视可写性的文件描述符集合。
+    // exceptfds: 指向 fd_set 结构体的指针，用于指定要监视异常情况的文件描述符集合。
+    // timeout: 指向 timeval 结构体的指针，用于设置超时时间。如果设置为 NULL，则 select() 将无限期阻塞，直到某个文件描述符准备好为止。
+    //     返回值：
+    // 成功时返回准备好的文件描述符的总数。
+    // 超时时返回0。
+    // 出错时返回-1并设置errno。
     int rv = select(sockfd + 1, &read_fds, NULL, NULL, &timeout);
+
     if (rv == -1) {
         perror("select"); // Error occurred
         return -1;
@@ -102,6 +157,15 @@ ssize_t recvPacket(int sockfd, Packet& pkt, sockaddr_in& addr, int timeout_sec =
         // Timeout occurred
         return 0;
     } else {
+        // recvfrom(): 用于接收数据包的系统调用，也常用于UDP套接字。它允许你从套接字接收数据，并获取发送方的地址信息。
+        // 参数：
+        // sockfd: 套接字文件描述符。
+        // buf: 指向接收数据缓冲区的指针。
+        // len: 缓冲区的大小，即最大可接收的字节数。
+        // flags: 通常设置为0。类似于sendto()，可以设置一些标志位。
+        // src_addr: 指向 sockaddr 结构体的指针，用于存储发送方的地址信息。
+        // addrlen: 指向一个整数的指针，传入时表示 src_addr 结构体的大小，返回时表示实际接收到的地址信息的长度。
+        // 返回值：成功时返回接收的字节数，失败时返回-1并设置errno。
         ssize_t bytes_received = recvfrom(sockfd, &pkt, sizeof(pkt), 0,
                                           (struct sockaddr*)&addr, &addr_len);
         uint32_t received_checksum = pkt.checksum;
