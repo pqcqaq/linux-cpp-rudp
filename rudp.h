@@ -17,16 +17,19 @@ const int DATA_SIZE = MAX_BUFFER_SIZE - HEADER_SIZE;
 
 // Message Types
 enum MessageType {
-    SYN = 1,
-    SYN_ACK,
-    ACK,
-    DATA,
-    DATA_ACK,
-    FIN,
-    FIN_ACK
+    SYN = 1, // 握手请求
+    SYN_ACK, // 握手应答
+    ACK, // 确认应答
+    DATA, // 数据包
+    DATA_ACK, // 数据包应答
+    FIN, // 关闭请求
+    FIN_ACK // 关闭应答
 };
 
-// Packet Structure
+/**
+ * @brief  数据包结构
+ *  这里全部使用无符号整型，并且指定大小，以保证在不同平台上的一致性。
+ */
 struct Packet {
     uint32_t type;
     uint32_t seq;
@@ -34,7 +37,7 @@ struct Packet {
     char data[DATA_SIZE];
 
     Packet() : type(0), seq(0), checksum(0) {
-        memset(data, 0, DATA_SIZE);
+        memset(data, 0, DATA_SIZE); // 对申请的内存进行初始化，全部置为 0
     }
 };
 
@@ -52,7 +55,14 @@ uint32_t calculateChecksum(Packet& pkt) {
     return sum;
 }
 
-// Function to send a packet
+/**
+ * @brief  发送数据包
+ *  发送数据包时，需要计算校验和，并将校验和填充到数据包中。
+ * @param sockfd  socket 文件描述符
+ * @param pkt  要发送的数据包
+ * @param addr  目标地址
+ * @return ssize_t  返回发送的字节数
+ */
 ssize_t sendPacket(int sockfd, const Packet& pkt, const sockaddr_in& addr) {
     Packet send_pkt = pkt;
     send_pkt.checksum = calculateChecksum(send_pkt);
@@ -61,7 +71,16 @@ ssize_t sendPacket(int sockfd, const Packet& pkt, const sockaddr_in& addr) {
     return bytes_sent;
 }
 
-// Function to receive a packet with timeout
+
+/**
+ * @brief  接收数据包
+ *  接收数据包时，需要验证校验和，如果校验和不匹配，则返回 -1。
+ * @param sockfd  socket 文件描述符
+ * @param pkt  接收到的数据包
+ * @param addr  发送方地址
+ * @param timeout_sec  超时时间（秒）
+ * @return ssize_t  返回接收的字节数
+ */
 ssize_t recvPacket(int sockfd, Packet& pkt, sockaddr_in& addr, int timeout_sec = 1) {
     socklen_t addr_len = sizeof(addr);
     fd_set read_fds;
@@ -93,7 +112,18 @@ ssize_t recvPacket(int sockfd, Packet& pkt, sockaddr_in& addr, int timeout_sec =
     }
 }
 
-// Function for server to accept connection (Three-way handshake)
+/*
+    上面是基本的数据包发送和接收函数，下面是连接建立、数据传输和连接关闭的函数。
+    服务端和客户端并不是对等的，所以上面俩可以通用，但是下面的握手和挥手都需要单独实现。
+*/
+
+/**
+ * @brief  服务器接受连接请求（三次握手）
+ *  服务器接受连接请求，需要接收 SYN 数据包，然后发送 SYN-ACK 数据包，最后接收 ACK 数据包。
+ * @param sockfd  socket 文件描述符
+ * @param client_addr  客户端地址
+ * @return int  返回 0 表示连接建立成功，返回 -1 表示连接建立失败
+ */
 int rudp_accept(int sockfd, sockaddr_in& client_addr) {
     Packet pkt;
     while (true) {
@@ -126,7 +156,13 @@ int rudp_accept(int sockfd, sockaddr_in& client_addr) {
     return -1; // Should not reach here
 }
 
-// Function for client to connect to server (Three-way handshake)
+/**
+ * @brief  客户端连接服务器（三次握手）
+ *  客户端连接服务器，需要发送 SYN 数据包，然后接收 SYN-ACK 数据包，最后发送 ACK 数据包。
+ * @param sockfd  socket 文件描述符
+ * @param server_addr  服务器地址
+ * @return int  返回 0 表示连接建立成功，返回 -1 表示连接建立失败
+ */
 int rudp_connect(int sockfd, sockaddr_in& server_addr) {
     Packet pkt;
     Packet recv_pkt;
@@ -161,7 +197,15 @@ int rudp_connect(int sockfd, sockaddr_in& server_addr) {
     return -1; // Should not reach here
 }
 
-// Function to send data
+/**
+ * @brief  发送数据
+ *  发送数据时，需要等待 ACK 数据包，如果超时或者接收到错误的 ACK 数据包，则重发数据。
+ * @param sockfd  socket 文件描述符
+ * @param data  要发送的数据
+ * @param length  数据长度
+ * @param addr      目标地址
+ * @return ssize_t  返回发送的字节数
+ */
 ssize_t rudp_send_data(int sockfd, const char* data, size_t length, const sockaddr_in& addr) {
     uint32_t seq_num = 0;
     Packet data_pkt;
@@ -195,7 +239,15 @@ ssize_t rudp_send_data(int sockfd, const char* data, size_t length, const sockad
     return -1; // Should not reach here
 }
 
-// Function to receive data
+/**
+ * @brief  接收数据
+ *  接收数据时，需要等待数据包，然后发送 ACK 数据包。
+ * @param sockfd  socket 文件描述符
+ * @param buffer  接收数据的缓冲区
+ * @param max_length  缓冲区最大长度
+ * @param addr      发送方地址
+ * @return ssize_t  返回接收的字节数
+ */
 ssize_t rudp_receive_data(int sockfd, char* buffer, size_t max_length, sockaddr_in& addr) {
     uint32_t expected_seq = 0;
     while (true) {
@@ -235,7 +287,13 @@ ssize_t rudp_receive_data(int sockfd, char* buffer, size_t max_length, sockaddr_
     return -1; // Should not reach here
 }
 
-// Function to close connection (Four-way handshake)
+/**
+ * @brief 关闭连接（四次挥手）
+ *  关闭连接时，需要发送 FIN 数据包，然后等待 FIN-ACK 数据包。
+ * @param sockfd  socket 文件描述符
+ * @param addr  目标地址
+ * @return int  返回 0 表示连接关闭成功，返回 -1 表示连接关闭失败
+ */
 int rudp_close_connection(int sockfd, sockaddr_in& addr) {
     // Send FIN
     Packet fin_pkt;
@@ -263,7 +321,13 @@ int rudp_close_connection(int sockfd, sockaddr_in& addr) {
     return -1; // Should not reach here
 }
 
-// Function to wait for close request and respond (Four-way handshake)
+/**
+ * @brief  等待关闭连接（四次挥手）
+ *  等待关闭连接时，需要等待 FIN 数据包，然后发送 FIN-ACK 数据包。
+ * @param sockfd  socket 文件描述符
+ * @param addr  发送方地址
+ * @return int  返回 0 表示连接关闭成功，返回 -1 表示连接关闭失败
+ */
 int rudp_wait_close(int sockfd, sockaddr_in& addr) {
     while (true) {
         Packet pkt;
