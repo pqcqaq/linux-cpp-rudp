@@ -65,7 +65,8 @@ int main(int argc, char* argv[]) {
 
     // 向服务器发送数据（例如发送 "Hello World"）
     const char* message = "Hello from Client";
-    ssize_t sent_bytes = rudp_send_data(sockfd, message, strlen(message) + 1, server_addr);
+    uint32_t seq_num = 0;
+    ssize_t sent_bytes = rudp_send_data(sockfd, message, strlen(message) + 1, server_addr, seq_num);
     if (sent_bytes > 0) {
         LOG(INFO) << "Sent data to server: " << message;
     } else {
@@ -75,7 +76,8 @@ int main(int argc, char* argv[]) {
 
     // 从服务器接收数据（例如接收 "Hello" 消息）
     char buffer[DATA_SIZE];
-    ssize_t received_bytes = rudp_receive_data(sockfd, buffer, DATA_SIZE, server_addr);
+    uint32_t expected_seq = 0;
+    ssize_t received_bytes = rudp_receive_data(sockfd, buffer, DATA_SIZE, server_addr, expected_seq);
     if (received_bytes > 0) {
         LOG(INFO) << "Received data from server: " << buffer;
     } else {

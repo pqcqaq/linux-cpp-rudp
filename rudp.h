@@ -12,7 +12,7 @@
 
 // Constants
 const int MAX_BUFFER_SIZE = 1024;
-const int HEADER_SIZE = 12; // type (4 bytes) + seq (4 bytes) + checksum (4 bytes)
+const int HEADER_SIZE = 16; // type (4 bytes) + seq (4 bytes) + checksum (4 bytes) + data_length (4 bytes)
 const int DATA_SIZE = MAX_BUFFER_SIZE - HEADER_SIZE;
 
 // Message Types
@@ -34,10 +34,11 @@ struct Packet {
     uint32_t type;
     uint32_t seq;
     uint32_t checksum;
+    uint32_t data_length;  //  记录实际数据长度
     char data[DATA_SIZE];
 
-    Packet() : type(0), seq(0), checksum(0) {
-        memset(data, 0, DATA_SIZE); // 对申请的内存进行初始化，全部置为 0
+    Packet() : type(0), seq(0), checksum(0), data_length(0) {
+        memset(data, 0, DATA_SIZE); // 将 data 字段初始化为 0
     }
 };
 
@@ -48,8 +49,8 @@ struct Packet {
  * @return uint32_t  返回计算得到的校验和
  */
 uint32_t calculateChecksum(Packet& pkt) {
-    uint32_t sum = pkt.type + pkt.seq;
-    for (int i = 0; i < DATA_SIZE; ++i) {
+    uint32_t sum = pkt.type + pkt.seq + pkt.data_length;
+    for (uint32_t i = 0; i < pkt.data_length; ++i) {
         sum += static_cast<uint8_t>(pkt.data[i]);
     }
     return sum;
@@ -65,6 +66,8 @@ uint32_t calculateChecksum(Packet& pkt) {
  */
 ssize_t sendPacket(int sockfd, const Packet& pkt, const sockaddr_in& addr) {
     Packet send_pkt = pkt;
+    // 确保数据包的长度正确
+    send_pkt.checksum = 0;  // Reset checksum before calculation
     send_pkt.checksum = calculateChecksum(send_pkt);
     ssize_t bytes_sent = sendto(sockfd, &send_pkt, sizeof(send_pkt), 0,
                                 (const struct sockaddr*)&addr, sizeof(addr));
@@ -206,25 +209,25 @@ int rudp_connect(int sockfd, sockaddr_in& server_addr) {
  * @param addr      目标地址
  * @return ssize_t  返回发送的字节数
  */
-ssize_t rudp_send_data(int sockfd, const char* data, size_t length, const sockaddr_in& addr) {
-    uint32_t seq_num = 0;
+ssize_t rudp_send_data(int sockfd, const char* data, size_t length, const sockaddr_in& addr, uint32_t& seq_num) {
     Packet data_pkt;
     data_pkt.type = DATA;
     data_pkt.seq = seq_num;
-    memset(data_pkt.data, 0, DATA_SIZE);
     // Copy data into packet data field
     size_t data_length = (length < DATA_SIZE) ? length : DATA_SIZE;
     memcpy(data_pkt.data, data, data_length);
+    data_pkt.data_length = data_length;  // Set the actual length of data
+    data_pkt.checksum = 0;  // Ensure checksum is reset
 
     while (true) {
         sendPacket(sockfd, data_pkt, addr);
-        LOG(INFO) << "Sent data packet with seq " << seq_num;
+        LOG(INFO) << "Sent data packet with seq " << seq_num << " and length " << data_length;
         // Wait for ACK
         Packet pkt;
         ssize_t n = recvPacket(sockfd, pkt, const_cast<sockaddr_in&>(addr));
         if (n > 0 && pkt.type == DATA_ACK && pkt.seq == seq_num) {
             LOG(INFO) << "Received ACK for seq " << seq_num;
-            seq_num++;
+            seq_num = (seq_num + 1) % 2;  // 根据停等协议，在收到 ACK 后切换序号
             return data_length;
         } else if (n == 0) {
             // Timeout, resend data
@@ -248,14 +251,13 @@ ssize_t rudp_send_data(int sockfd, const char* data, size_t length, const sockad
  * @param addr      发送方地址
  * @return ssize_t  返回接收的字节数
  */
-ssize_t rudp_receive_data(int sockfd, char* buffer, size_t max_length, sockaddr_in& addr) {
-    uint32_t expected_seq = 0;
+ssize_t rudp_receive_data(int sockfd, char* buffer, size_t max_length, sockaddr_in& addr, uint32_t& expected_seq) {
     while (true) {
         Packet pkt;
         ssize_t n = recvPacket(sockfd, pkt, addr);
         if (n > 0 && pkt.type == DATA) {
             if (pkt.seq == expected_seq) {
-                LOG(INFO) << "Received data packet with seq " << pkt.seq;
+                LOG(INFO) << "Received data packet with seq " << pkt.seq << " and length " << pkt.data_length;
                 // Send DATA_ACK
                 Packet ack_pkt;
                 ack_pkt.type = DATA_ACK;
@@ -263,15 +265,15 @@ ssize_t rudp_receive_data(int sockfd, char* buffer, size_t max_length, sockaddr_
                 sendPacket(sockfd, ack_pkt, addr);
                 LOG(INFO) << "Sent ACK for seq " << pkt.seq;
                 // Copy data to buffer
-                size_t data_length = (max_length < DATA_SIZE) ? max_length : DATA_SIZE;
+                size_t data_length = (pkt.data_length < max_length) ? pkt.data_length : max_length;
                 memcpy(buffer, pkt.data, data_length);
-                expected_seq++;
+                expected_seq = (expected_seq + 1) % 2;  // Alternate expected sequence number
                 return data_length;
             } else {
                 // Send ACK for last received packet
                 Packet ack_pkt;
                 ack_pkt.type = DATA_ACK;
-                ack_pkt.seq = expected_seq - 1;
+                ack_pkt.seq = (expected_seq + 1) % 2;
                 sendPacket(sockfd, ack_pkt, addr);
                 LOG(WARNING) << "Unexpected seq. Expected " << expected_seq
                              << ", but got " << pkt.seq;

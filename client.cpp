@@ -73,10 +73,10 @@ int main(int argc, char* argv[]) {
 
     char buffer[DATA_SIZE];
     ssize_t sent_bytes;
-
+    uint32_t seq_num = 0;
     while (infile.read(buffer, DATA_SIZE) || infile.gcount() > 0) {
         std::streamsize bytes_read = infile.gcount();
-        sent_bytes = rudp_send_data(sockfd, buffer, bytes_read, server_addr);
+        sent_bytes = rudp_send_data(sockfd, buffer, bytes_read, server_addr, seq_num);
         if (sent_bytes > 0) {
             LOG(INFO) << "Sent data chunk of size " << sent_bytes;
         } else {
@@ -96,15 +96,6 @@ int main(int argc, char* argv[]) {
     infile.close();
     LOG(INFO) << "File sent to server";
 
-    // 关闭发送方向的连接（四次挥手）
-    if (rudp_close_connection(sockfd, server_addr) == 0) {
-        LOG(INFO) << "Connection closed for sending data";
-    } else {
-        LOG(ERROR) << "Failed to close connection for sending data";
-        close(sockfd);
-        return -1;
-    }
-
     // 接收服务器发送的文件
     std::ofstream outfile("received_from_server_" + filename, std::ios::binary);
     if (!outfile) {
@@ -114,8 +105,9 @@ int main(int argc, char* argv[]) {
     }
 
     ssize_t received_bytes;
+    uint32_t expected_seq = 0;
     while (true) {
-        received_bytes = rudp_receive_data(sockfd, buffer, DATA_SIZE, server_addr);
+        received_bytes = rudp_receive_data(sockfd, buffer, DATA_SIZE, server_addr, expected_seq);
         if (received_bytes > 0) {
             // 写入接收到的数据到文件
             outfile.write(buffer, received_bytes);

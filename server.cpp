@@ -67,15 +67,16 @@ int main(int argc, char* argv[]) {
 
     char buffer[DATA_SIZE];
     ssize_t received_bytes;
-
+    uint32_t expected_seq = 0;
     while (true) {
-        received_bytes = rudp_receive_data(sockfd, buffer, DATA_SIZE, client_addr);
+        received_bytes = rudp_receive_data(sockfd, buffer, DATA_SIZE, client_addr, expected_seq);
         if (received_bytes > 0) {
             // 写入接收到的数据到文件
             outfile.write(buffer, received_bytes);
             LOG(INFO) << "Received data chunk of size " << received_bytes;
             if (received_bytes < DATA_SIZE) {
                 // 可能是最后一个数据包
+                LOG(INFO) << "Received the last data chunk";
                 break;
             }
         } else if (received_bytes == 0) {
@@ -102,9 +103,10 @@ int main(int argc, char* argv[]) {
     }
 
     ssize_t sent_bytes;
+    uint32_t seq_num = 0;
     while (infile.read(buffer, DATA_SIZE)) {
         std::streamsize bytes_read = infile.gcount();
-        sent_bytes = rudp_send_data(sockfd, buffer, bytes_read, client_addr);
+        sent_bytes = rudp_send_data(sockfd, buffer, bytes_read, client_addr, seq_num);
         if (sent_bytes > 0) {
             LOG(INFO) << "Sent data chunk of size " << sent_bytes;
         } else {
@@ -117,7 +119,7 @@ int main(int argc, char* argv[]) {
     if (infile.eof()) {
         std::streamsize bytes_read = infile.gcount();
         if (bytes_read > 0) {
-            sent_bytes = rudp_send_data(sockfd, buffer, bytes_read, client_addr);
+            sent_bytes = rudp_send_data(sockfd, buffer, bytes_read, client_addr, seq_num);
             if (sent_bytes > 0) {
                 LOG(INFO) << "Sent final data chunk of size " << sent_bytes;
             } else {
