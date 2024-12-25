@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 3.10)
 project(RUDP)
 
 # Set the C++ standard
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 23)
 
 # Find glog package
 find_package(Glog REQUIRED)
