@@ -1,6 +1,7 @@
 // client.cpp
-#include "rudp.h"
 #include <fstream>
+
+#include "rudp.h"
 
 // 客户端实现，发送文件给服务器，然后接收服务器的文件
 int main(int argc, char* argv[]) {
@@ -8,11 +9,11 @@ int main(int argc, char* argv[]) {
     google::InitGoogleLogging(argv[0]);
 
     // 日志配置
-    FLAGS_log_dir = "./logs";       // 日志保存目录
-    FLAGS_logtostderr = 1;          // 日志输出到 stderr
-    FLAGS_minloglevel = 0;          // 日志级别: INFO 及以上
-    FLAGS_colorlogtostderr = true;  //设置输出到屏幕的日志显示相应颜色
-    FLAGS_colorlogtostdout = true;  //设置输出到标准输出的日志显示相应颜色
+    FLAGS_log_dir = "./logs";  // 日志保存目录
+    FLAGS_logtostderr = 1;     // 日志输出到 stderr
+    FLAGS_minloglevel = 0;     // 日志级别: INFO 及以上
+    FLAGS_colorlogtostderr = true;  // 设置输出到屏幕的日志显示相应颜色
+    FLAGS_colorlogtostdout = true;  // 设置输出到标准输出的日志显示相应颜色
     FLAGS_v = 2;                    // 设置详细级别
 
     if (argc != 3) {
@@ -45,7 +46,8 @@ int main(int argc, char* argv[]) {
     server_addr.sin_port = htons(port);
 
     // 处理 "localhost" 地址
-    // 按理说这边应该走 DNS 解析，但是不知道为什么没用，所以在inet_pton()之前手动处理
+    // 按理说这边应该走 DNS
+    // 解析，但是不知道为什么没用，所以在inet_pton()之前手动处理
     // 这里的处理不是很优雅，希望有更好的解决方式
     if (host == "localhost") {
         host = "127.0.0.1";
@@ -80,7 +82,8 @@ int main(int argc, char* argv[]) {
     uint32_t seq_num = 0;
     while (infile.read(buffer, DATA_SIZE) || infile.gcount() > 0) {
         std::streamsize bytes_read = infile.gcount();
-        sent_bytes = rudp_send_data(sockfd, buffer, bytes_read, server_addr, seq_num);
+        sent_bytes =
+            rudp_send_data(sockfd, buffer, bytes_read, server_addr, seq_num);
         if (sent_bytes > 0) {
             LOG(INFO) << "Sent data chunk of size " << sent_bytes;
         } else {
@@ -111,7 +114,8 @@ int main(int argc, char* argv[]) {
     ssize_t received_bytes;
     uint32_t expected_seq = 0;
     while (true) {
-        received_bytes = rudp_receive_data(sockfd, buffer, DATA_SIZE, server_addr, expected_seq);
+        received_bytes = rudp_receive_data(sockfd, buffer, DATA_SIZE,
+                                           server_addr, expected_seq);
         if (received_bytes > 0) {
             // 写入接收到的数据到文件
             outfile.write(buffer, received_bytes);

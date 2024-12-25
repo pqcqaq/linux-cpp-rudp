@@ -1,6 +1,7 @@
 // client.cpp
+#include <cstring>  // 为 strncpy 引入头文件
+
 #include "rudp.h"
-#include <cstring> // 为 strncpy 引入头文件
 
 // 这是客户端的实现
 int main(int argc, char* argv[]) {
@@ -12,8 +13,8 @@ int main(int argc, char* argv[]) {
     FLAGS_log_dir = "./logs";       // 日志保存目录
     FLAGS_logtostderr = 1;          // 日志输出到 stderr
     FLAGS_minloglevel = 0;          // 日志级别: INFO 及以上
-    FLAGS_colorlogtostderr = true;  //设置输出到屏幕的日志显示相应颜色
-    FLAGS_colorlogtostdout = true;  //设置输出到标准输出的日志显示相应颜色
+    FLAGS_colorlogtostderr = true;  // 设置输出到屏幕的日志显示相应颜色
+    FLAGS_colorlogtostdout = true;  // 设置输出到标准输出的日志显示相应颜色
     FLAGS_v = 2;                    // 设置详细级别
 
     if (argc != 2) {
@@ -67,7 +68,8 @@ int main(int argc, char* argv[]) {
     // 向服务器发送数据（例如发送 "Hello World"）
     const char* message = "Hello from Client";
     uint32_t seq_num = 0;
-    ssize_t sent_bytes = rudp_send_data(sockfd, message, strlen(message) + 1, server_addr, seq_num);
+    ssize_t sent_bytes = rudp_send_data(sockfd, message, strlen(message) + 1,
+                                        server_addr, seq_num);
     if (sent_bytes > 0) {
         LOG(INFO) << "Sent data to server: " << message;
     } else {
@@ -78,7 +80,8 @@ int main(int argc, char* argv[]) {
     // 从服务器接收数据（例如接收 "Hello" 消息）
     char buffer[DATA_SIZE];
     uint32_t expected_seq = 0;
-    ssize_t received_bytes = rudp_receive_data(sockfd, buffer, DATA_SIZE, server_addr, expected_seq);
+    ssize_t received_bytes =
+        rudp_receive_data(sockfd, buffer, DATA_SIZE, server_addr, expected_seq);
     if (received_bytes > 0) {
         LOG(INFO) << "Received data from server: " << buffer;
     } else {

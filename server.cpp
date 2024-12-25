@@ -1,6 +1,7 @@
 // server.cpp
-#include "rudp.h"
 #include <fstream>
+
+#include "rudp.h"
 
 // 这是服务端的实现，为了方便，这里没有考虑多客户机的情况。
 // 如果要使用多客户机，可以添加pthread
@@ -10,11 +11,11 @@ int main(int argc, char* argv[]) {
     std::string process_name = argv[0];
     google::InitGoogleLogging(argv[0]);
     // 日志配置
-    FLAGS_log_dir = "./logs";       // 日志保存目录
-    FLAGS_logtostderr = 1;          // 日志输出到 stderr
-    FLAGS_minloglevel = 0;          // 日志级别: INFO 及以上
-    FLAGS_colorlogtostderr = true;  //设置输出到屏幕的日志显示相应颜色
-    FLAGS_colorlogtostdout = true;  //设置输出到标准输出的日志显示相应颜色
+    FLAGS_log_dir = "./logs";  // 日志保存目录
+    FLAGS_logtostderr = 1;     // 日志输出到 stderr
+    FLAGS_minloglevel = 0;     // 日志级别: INFO 及以上
+    FLAGS_colorlogtostderr = true;  // 设置输出到屏幕的日志显示相应颜色
+    FLAGS_colorlogtostdout = true;  // 设置输出到标准输出的日志显示相应颜色
     FLAGS_v = 2;                    // 设置详细级别
 
     if (argc != 3) {
@@ -40,7 +41,8 @@ int main(int argc, char* argv[]) {
     server_addr.sin_port = htons(port);
 
     // 检查端口是否被占用
-    if (bind(sockfd, (const struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
+    if (bind(sockfd, (const struct sockaddr*)&server_addr,
+             sizeof(server_addr)) < 0) {
         LOG(ERROR) << "Bind failed";
         close(sockfd);
         return -1;
@@ -70,7 +72,8 @@ int main(int argc, char* argv[]) {
     ssize_t received_bytes;
     uint32_t expected_seq = 0;
     while (true) {
-        received_bytes = rudp_receive_data(sockfd, buffer, DATA_SIZE, client_addr, expected_seq);
+        received_bytes = rudp_receive_data(sockfd, buffer, DATA_SIZE,
+                                           client_addr, expected_seq);
         if (received_bytes > 0) {
             // 写入接收到的数据到文件
             outfile.write(buffer, received_bytes);
@@ -107,7 +110,8 @@ int main(int argc, char* argv[]) {
     uint32_t seq_num = 0;
     while (infile.read(buffer, DATA_SIZE)) {
         std::streamsize bytes_read = infile.gcount();
-        sent_bytes = rudp_send_data(sockfd, buffer, bytes_read, client_addr, seq_num);
+        sent_bytes =
+            rudp_send_data(sockfd, buffer, bytes_read, client_addr, seq_num);
         if (sent_bytes > 0) {
             LOG(INFO) << "Sent data chunk of size " << sent_bytes;
         } else {
@@ -120,7 +124,8 @@ int main(int argc, char* argv[]) {
     if (infile.eof()) {
         std::streamsize bytes_read = infile.gcount();
         if (bytes_read > 0) {
-            sent_bytes = rudp_send_data(sockfd, buffer, bytes_read, client_addr, seq_num);
+            sent_bytes = rudp_send_data(sockfd, buffer, bytes_read, client_addr,
+                                        seq_num);
             if (sent_bytes > 0) {
                 LOG(INFO) << "Sent final data chunk of size " << sent_bytes;
             } else {
