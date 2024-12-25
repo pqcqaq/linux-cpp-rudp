@@ -2,9 +2,6 @@
 #include "rudp.h"
 #include <cstring> // 用于 strncpy
 
-// 服务器端实现，目前不支持多客户端。
-// 要支持多客户端，可以使用 pthreads。
-// 收到 SYN 后，生成一个新线程来处理该客户端(还没实现。
 // qc: 这个版本只是一个简单的示例，主要用于测试基本的 RUDP 功能。
 int main(int argc, char* argv[]) {
     std::string process_name = argv[0];

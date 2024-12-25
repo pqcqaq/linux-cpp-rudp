@@ -3,7 +3,6 @@
 #include <cstring> // 为 strncpy 引入头文件
 
 // 这是客户端的实现
-// 发送并接收数据，包含三次握手和四次挥手
 int main(int argc, char* argv[]) {
     // 进程名称
     std::string process_name = argv[0];
