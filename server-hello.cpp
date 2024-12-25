@@ -11,6 +11,8 @@ int main(int argc, char* argv[]) {
     FLAGS_log_dir = "./logs";       // 日志目录
     FLAGS_logtostderr = 1;          // 将日志输出到 stderr
     FLAGS_minloglevel = 0;          // 日志级别：INFO 及以上
+    FLAGS_colorlogtostderr = true;  //设置输出到屏幕的日志显示相应颜色
+    FLAGS_colorlogtostdout = true;  //设置输出到标准输出的日志显示相应颜色
     FLAGS_v = 2;                    // 详细级别
 
     // qc: 可以根据需要调整日志级别和输出位置。

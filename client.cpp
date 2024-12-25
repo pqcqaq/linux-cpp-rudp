@@ -11,6 +11,8 @@ int main(int argc, char* argv[]) {
     FLAGS_log_dir = "./logs";       // 日志保存目录
     FLAGS_logtostderr = 1;          // 日志输出到 stderr
     FLAGS_minloglevel = 0;          // 日志级别: INFO 及以上
+    FLAGS_colorlogtostderr = true;  //设置输出到屏幕的日志显示相应颜色
+    FLAGS_colorlogtostdout = true;  //设置输出到标准输出的日志显示相应颜色
     FLAGS_v = 2;                    // 设置详细级别
 
     if (argc != 3) {
@@ -43,6 +45,8 @@ int main(int argc, char* argv[]) {
     server_addr.sin_port = htons(port);
 
     // 处理 "localhost" 地址
+    // 按理说这边应该走 DNS 解析，但是不知道为什么没用，所以在inet_pton()之前手动处理
+    // 这里的处理不是很优雅，希望有更好的解决方式
     if (host == "localhost") {
         host = "127.0.0.1";
     }
