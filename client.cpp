@@ -2,10 +2,9 @@
 #include "rudp.h"
 #include <fstream>
 
-// 这里是客户端的实现
-// 先发文件，再收文件
-// 三次握手和四次挥手
+// 客户端实现，发送文件给服务器，然后接收服务器的文件
 int main(int argc, char* argv[]) {
+    std::string process_name = argv[0];
     google::InitGoogleLogging(argv[0]);
 
     // 日志配置
@@ -15,28 +14,26 @@ int main(int argc, char* argv[]) {
     FLAGS_v = 2;                    // 设置详细级别
 
     if (argc != 3) {
-        LOG(ERROR) << "Usage: ./client <host>:<port> <filename>";
+        LOG(ERROR) << "Usage: " << process_name << " <host>:<port> <filename>";
         return -1;
     }
 
     std::string host_port = argv[1];
     std::string filename = argv[2];
 
-    // 妈的这里要单独判断localhost的话感觉很不爽，就这样好了
     size_t colon_pos = host_port.find(':');
     if (colon_pos == std::string::npos) {
         LOG(ERROR) << "Invalid host:port format";
         return -1;
     }
 
-    // 没法支持localhost，解析不了这个ip
     std::string host = host_port.substr(0, colon_pos);
     int port = atoi(host_port.substr(colon_pos + 1).c_str());
 
     int sockfd;
     sockaddr_in server_addr{};
 
-    // Create UDP socket
+    // 创建 UDP socket
     if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
         LOG(ERROR) << "Socket creation failed";
         return -1;
@@ -45,135 +42,112 @@ int main(int argc, char* argv[]) {
     server_addr.sin_family = AF_INET;
     server_addr.sin_port = htons(port);
 
+    // 处理 "localhost" 地址
+    if (host == "localhost") {
+        host = "127.0.0.1";
+    }
+
     if (inet_pton(AF_INET, host.c_str(), &server_addr.sin_addr) <= 0) {
         LOG(ERROR) << "Invalid address/ Address not supported";
         close(sockfd);
         return -1;
     }
 
-    // Connection establishment (three-way handshake)
-    Packet pkt;
-    Packet recv_pkt;
-
-    // Send SYN 一旦连接创建出来了，就先发一个握手包，看看能不能通
-    pkt.type = SYN;
-    pkt.seq = 0;
-    sendPacket(sockfd, pkt, server_addr);
-    LOG(INFO) << "Sent SYN to server";
-
-    // Wait for SYN-ACK
-    while (true) {
-        ssize_t n = recvPacket(sockfd, recv_pkt, server_addr);
-        if (n > 0 && recv_pkt.type == SYN_ACK) {
-            LOG(INFO) << "Received SYN-ACK from server";
-            // Send ACK
-            pkt.type = ACK;
-            pkt.seq = recv_pkt.seq;
-            sendPacket(sockfd, pkt, server_addr);
-            LOG(INFO) << "Sent ACK to server";
-            break; // Connection established
-        }
-    }
-
-    // Send file to server
-    std::ifstream infile(filename, std::ios::binary);
-    if (!infile) {
-        LOG(ERROR) << "Failed to open file " << filename;
+    // 连接建立（三次握手）
+    if (rudp_connect(sockfd, server_addr) == 0) {
+        LOG(INFO) << "Connected to server";
+    } else {
+        LOG(ERROR) << "Failed to connect to server";
         close(sockfd);
         return -1;
     }
 
-    // 客户端先发送文件，没什么好说的
-    uint32_t seq_num = 0;
-    while (true) {
-        Packet data_pkt;
-        data_pkt.type = DATA;
-        data_pkt.seq = seq_num;
-        infile.read(data_pkt.data, DATA_SIZE);
+    // 发送文件给服务器
+    std::ifstream infile(filename, std::ios::binary);
+    if (!infile) {
+        LOG(ERROR) << "Failed to open file " << filename;
+        rudp_close_connection(sockfd, server_addr);
+        close(sockfd);
+        return -1;
+    }
+
+    char buffer[DATA_SIZE];
+    ssize_t sent_bytes;
+
+    while (infile.read(buffer, DATA_SIZE) || infile.gcount() > 0) {
         std::streamsize bytes_read = infile.gcount();
-        if (bytes_read > 0) {
-            // Send DATA packet
-            while (true) {
-                sendPacket(sockfd, data_pkt, server_addr);
-                LOG(INFO) << "Sent data packet with seq " << seq_num;
-                // Wait for ACK
-                ssize_t n = recvPacket(sockfd, recv_pkt, server_addr);
-                if (n > 0 && recv_pkt.type == DATA_ACK && recv_pkt.seq == seq_num) {
-                    LOG(INFO) << "Received ACK for seq " << seq_num;
-                    seq_num++;
-                    break;
-                } else {
-                    LOG(WARNING) << "No ACK or wrong ACK received, resending packet";
-                    // Resend the packet
-                    continue;
-                }
-            }
+        sent_bytes = rudp_send_data(sockfd, buffer, bytes_read, server_addr);
+        if (sent_bytes > 0) {
+            LOG(INFO) << "Sent data chunk of size " << sent_bytes;
         } else {
-            // End of file
+            LOG(ERROR) << "Failed to send data to server";
+            // 处理错误或退出
             infile.close();
+            rudp_close_connection(sockfd, server_addr);
+            close(sockfd);
+            return -1;
+        }
+        // 如果读取的字节数小于 DATA_SIZE，可能是最后一个数据块
+        if (bytes_read < DATA_SIZE) {
             break;
         }
     }
 
-    // 这里已经可以断开连接了，实际上等服务端的FIN-ASK的时候，中间再去接受个文件也行
-    // Initiate connection termination
-    Packet fin_pkt;
-    fin_pkt.type = FIN;
-    sendPacket(sockfd, fin_pkt, server_addr);
-    LOG(INFO) << "Sent FIN to server";
+    infile.close();
+    LOG(INFO) << "File sent to server";
 
-    // Wait for FIN-ACK
-    while (true) {
-        ssize_t n = recvPacket(sockfd, recv_pkt, server_addr);
-        if (n > 0 && recv_pkt.type == FIN_ACK) {
-            LOG(INFO) << "Received FIN-ACK from server";
-            break;
-        }
+    // 关闭发送方向的连接（四次挥手）
+    if (rudp_close_connection(sockfd, server_addr) == 0) {
+        LOG(INFO) << "Connection closed for sending data";
+    } else {
+        LOG(ERROR) << "Failed to close connection for sending data";
+        close(sockfd);
+        return -1;
     }
 
-    // Receive file from server
+    // 接收服务器发送的文件
     std::ofstream outfile("received_from_server_" + filename, std::ios::binary);
-    uint32_t expected_seq = 0;
+    if (!outfile) {
+        LOG(ERROR) << "Failed to create output file";
+        close(sockfd);
+        return -1;
+    }
+
+    ssize_t received_bytes;
     while (true) {
-        ssize_t n = recvPacket(sockfd, recv_pkt, server_addr);
-        if (n > 0 && recv_pkt.type == DATA) {
-            if (recv_pkt.seq == expected_seq) {
-                outfile.write(recv_pkt.data, n - HEADER_SIZE);
-                LOG(INFO) << "Received data packet with seq " << recv_pkt.seq;
-                // Send DATA_ACK
-                Packet ack_pkt;
-                ack_pkt.type = DATA_ACK;
-                ack_pkt.seq = recv_pkt.seq;
-                sendPacket(sockfd, ack_pkt, server_addr);
-                LOG(INFO) << "Sent ACK for seq " << recv_pkt.seq;
-                expected_seq++;
-            } else {
-                // Send ACK for last received packet
-                Packet ack_pkt;
-                ack_pkt.type = DATA_ACK;
-                ack_pkt.seq = expected_seq - 1;
-                sendPacket(sockfd, ack_pkt, server_addr);
-                LOG(WARNING) << "Unexpected seq. Expected " << expected_seq
-                             << ", but got " << recv_pkt.seq;
+        received_bytes = rudp_receive_data(sockfd, buffer, DATA_SIZE, server_addr);
+        if (received_bytes > 0) {
+            // 写入接收到的数据到文件
+            outfile.write(buffer, received_bytes);
+            LOG(INFO) << "Received data chunk of size " << received_bytes;
+            if (received_bytes < DATA_SIZE) {
+                // 可能是最后一个数据包
+                break;
             }
-        } else if (n == 0) {
-            // Timeout, continue waiting
-            continue;
-        } else if (recv_pkt.type == FIN) {
-            LOG(INFO) << "Received FIN from server";
-            // Send FIN-ACK
-            Packet fin_ack_pkt;
-            fin_ack_pkt.type = FIN_ACK;
-            sendPacket(sockfd, fin_ack_pkt, server_addr);
-	    // 最后一次挥手
-            LOG(INFO) << "Sent FIN-ACK to server";
+        } else if (received_bytes == 0) {
+            // 数据接收完成
             break;
+        } else {
+            LOG(ERROR) << "Failed to receive data from server";
+            // 处理错误或退出
+            outfile.close();
+            close(sockfd);
+            return -1;
         }
     }
-    outfile.close();
 
+    outfile.close();
+    LOG(INFO) << "File received from server";
+
+    // 等待服务器关闭连接（四次挥手）
+    if (rudp_wait_close(sockfd, server_addr) == 0) {
+        LOG(INFO) << "Connection closed by server";
+    } else {
+        LOG(ERROR) << "Failed during connection termination";
+    }
+
+    // 关闭 socket
     close(sockfd);
-    LOG(INFO) << "Connection closed";
+    LOG(INFO) << "Socket closed";
     return 0;
 }
-
